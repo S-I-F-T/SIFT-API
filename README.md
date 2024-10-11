@@ -8,4 +8,4 @@ GET: /assignment/{key} Retrieve a zipped folder for the assigment associated wit
 
 POST: /asssignment/{key} Add assignment information with the associated key
 
-DELETE: /assignment/{key} Delete the assignment with th
+DELETE: /assignment/{key} Delete the assignment with the associated key
