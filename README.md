@@ -9,3 +9,12 @@ GET: /assignment/{key} Retrieve a zipped folder for the assigment associated wit
 POST: /asssignment/{key} Add assignment information with the associated key
 
 DELETE: /assignment/{key} Delete the assignment with the associated key
+
+
+# Versioning
+https://nordicapis.com/5-ways-to-version-apis/
+
+The API versioning uses subdomains to implement API versioning. 
+In server.ts, the version 1 router is defined as:
+``` const v1SiftApi = express.Router(); ```
+The ```app.use('/v1', v1SiftApi);``` mounts the v1 api router and tells the Express app to use ```v1SiftApi``` router for any requests that start with ```/v1.```   
