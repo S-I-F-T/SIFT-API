@@ -1,7 +1,7 @@
-import express = require('express');
-import mongoose = require('mongoose');
-import gridfsStream = require('gridfs-stream');
-import multer = require('multer');
+import express from 'express';
+import mongoose from 'mongoose';
+import multer from 'multer';
+import { GridFSBucket } from 'mongodb';
 
 const app = express();
 const port = 3000;
@@ -12,11 +12,10 @@ const v2SiftApi = express.Router();
 const mongoURI = 'mongodb://localhost:27017/test';
 const conn = mongoose.createConnection(mongoURI);
 
-let gfs: gridfsStream.Grid | null = null;
+let gfsBucket: GridFSBucket | null = null;
 
 conn.once('open', () => {
-  gfs = gridfsStream(conn.db, mongoose.mongo);
-  gfs.collection('uploads');
+  gfsBucket = new GridFSBucket(conn.db as any, { bucketName: 'uploads' });
   console.log('Connection to MongoDB is successful!');
 });
 
@@ -30,37 +29,49 @@ v1SiftApi.get('/', (req: express.Request, res: express.Response) => {
 });
 
 // Retrieve a zipped folder for the assignment associated with {key}
-v1SiftApi.get('/assignment/:key', (req: express.Request, res: express.Response) => {
-  res.send('Hello TypeScript with Express!');
+v1SiftApi.get('/assignment/:key', (req, res) => {
+  const fileId = req.params.key;
+
+  if (!gfsBucket) {
+    res.status(500).send('GridFSBucket not initialized!');
+    return;
+  }
+
+  try {
+    const downloadStream = gfsBucket.openDownloadStream(new mongoose.Types.ObjectId(fileId));
+
+    downloadStream.on('data', (chunk) => res.write(chunk));
+    downloadStream.on('end', () => res.end());
+    downloadStream.on('error', (err) => {
+      console.error(err);
+      res.status(404).send('File not found!');
+    });
+  } catch (err) {
+    res.status(400).send('Invalid file ID!');
+  }
 });
 
 // Add assignment information with the associated key
-v1SiftApi.post(
-  '/assignment/:key',
-  upload.single('file'),
-  (req: express.Request, res: express.Response) => {
-
-    // If file is not uploaded or gfs is not initialized, return an error
-    if (!req.file || !gfs) {
-      res.status(400).send('No file uploaded!');
-      return;
-    }
-
-    const uploadStream = gfs.createWriteStream({
-      filename: req.file.originalname,
-      content_type: req.file.mimetype,
-    });
-    uploadStream.end(req.file.buffer);
-
-    uploadStream.on('finish', (file) => {
-      res.send(`File uploaded successfully: ${file.filename}`);
-    });
-
-    uploadStream.on('error', (error) => {
-      res.status(500).send('Error uploading file!');
-    });
+v1SiftApi.post('/assignment/:key', upload.single('file'), (req, res) => {
+  if (!req.file || !gfsBucket) {
+    res.status(400).send('No file uploaded or GridFSBucket not initialized!');
+    return;
   }
-);
+
+  const uploadStream = gfsBucket.openUploadStream(req.file.originalname, {
+    contentType: req.file.mimetype,
+  });
+  uploadStream.end(req.file.buffer);
+
+  uploadStream.on('finish', (file) => {
+    res.send(`File uploaded successfully with ID: ${file._id}`);
+  });
+
+  uploadStream.on('error', (err) => {
+    console.error(err);
+    res.status(500).send('Error uploading file!');
+  });
+});
 
 v1SiftApi.put('/assignment/:key', (req: express.Request, res: express.Response) => {
   res.send('Hello TypeScript with Express!');
