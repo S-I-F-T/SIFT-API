@@ -39,6 +39,8 @@ v1SiftApi.post(
   '/assignment/:key',
   upload.single('file'),
   (req: express.Request, res: express.Response) => {
+
+    // If file is not uploaded or gfs is not initialized, return an error
     if (!req.file || !gfs) {
       res.status(400).send('No file uploaded!');
       return;
